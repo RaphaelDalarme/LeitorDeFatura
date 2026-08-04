@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financeiro & AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <header class="main-header">
+            <div class="logo-container">
+                <span class="logo-icon">💳</span>
+                <h1>Finanboarding</h1>
+            </div>
+            <p class="tagline">Seu onboarding para controle financeiro.</p>
+        </header>
+
+        <!-- Form de Upload -->
+        <div class="upload-card">
+            <form action="/" method="POST" enctype="multipart/form-data">
+                <div class="file-input-wrapper">
+                    <input type="file" name="fatura" id="fatura" accept=".pdf" required>
+                    <label for="fatura" class="file-label">📂 Selecionar Fatura PDF</label>
+                </div>
+                <button type="submit" class="btn-submit">Processar Dashboard</button>
+            </form>
+        </div>
+
+        {% if compras is not none %}
+        <div class="results-section">
+
+            <div class="card-insights">
+                <div class="insights-header">
+                    <span class="sparkle-icon">✨</span>
+                    <h2>Finanboarding Copilot (Gemini AI)</h2>
+                </div>
+                
+                <div class="insight-content">
+                    {{ insight_ia | safe }}
+                </div>
+            </div>
+            <div class="dashboard-grid">
+                
+                <div class="card-chart">
+                    <h2>Distribuição de Gastos</h2>
+                    <div class="chart-container">
+                        <canvas id="chartCategorias"></canvas>
+                    </div>
+                </div>
+
+                <div class="card-summary">
+                    <h2>Resumo das Categorias</h2>
+                    <ul class="category-list">
+                        {% for cat, total in totais.items() %}
+                        <li>
+                            <span class="cat-name">{{ cat }}</span>
+                            <span class="cat-value">R$ {{ "%.2f"|format(total) }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="total-geral">
+                        <span>Total Fatura:</span>
+                        <span>R$ {{ "%.2f"|format(total_geral) }}</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="card-table">
+                <h2>Extrato Detalhado</h2>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th>Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in compras %}
+                            <tr>
+                                <td>{{ item.data }}</td>
+                                <td>{{ item.descricao }}</td>
+                                <td><span class="badge">{{ item.categoria }}</span></td>
+                                <td class="value">R$ {{ "%.2f"|format(item.valor) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const ctx = document.getElementById('chartCategorias').getContext('2d');
+                
+                const labelsDataText = '{{ labels_grafico | safe }}';
+                const valuesDataText = '{{ valores_grafico | safe }}';
+
+                const labelsData = JSON.parse(labelsDataText);
+                const valuesData = JSON.parse(valuesDataText);
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labelsData,
+                        datasets: [{
+                            data: valuesData,
+                            backgroundColor: [
+                                '#38bdf8', '#818cf8', '#34d399', 
+                                '#fb7185', '#fbbf24', '#a78bfa'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#1e293b'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#94a3b8', font: { family: 'Inter' } }
+                            }
+                        }
+                    }
+                });
+            });
+        </script>
+        {% endif %}
+        <footer class="main-footer">
+            <p>Desenvolvido por <span>Raphael Dalarme</span></p>
+        </footer>
+
+    </div>
+
+</body>
+</html>
