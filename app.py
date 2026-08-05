@@ -134,31 +134,43 @@ def gerar_insights_gemini(totais, total_geral):
 def index():
     if request.method == 'POST':
         file = request.files.get('fatura')
-        if file and file.filename.endswith('.pdf'):
-            caminho = os.path.join(UPLOAD_FOLDER, file.filename)
-            file.save(caminho)
+        
+        if not file or not file.filename.lower().endswith('.pdf'):
+            return render_template('index.html', compras=None, erro="Por favor, envie um arquivo válido no formato PDF.")
 
+        caminho = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(caminho)
+
+        try:
             compras, totais, total_geral = processar_pdf(caminho)
+        except Exception as e:
+            compras = []
+
+        if os.path.exists(caminho):
             os.remove(caminho)
 
-            # Gera conselho financeiro com o Gemini
-            insight_bruto = gerar_insights_gemini(totais, total_geral)
-            
-            # Converte o Markdown retornado pelo Gemini em HTML limpo
-            insight_ia = markdown.markdown(insight_bruto)
-
-            labels_grafico = json.dumps(list(totais.keys()))
-            valores_grafico = json.dumps(list(totais.values()))
-
+        if not compras:
             return render_template(
-                'index.html',
-                compras=compras,
-                totais=totais,
-                total_geral=total_geral,
-                insight_ia=insight_ia,
-                labels_grafico=labels_grafico,
-                valores_grafico=valores_grafico
+                'index.html', 
+                compras=None, 
+                erro="Não foi possível ler as transações deste PDF. Verifique se o documento é uma fatura compatível."
             )
+
+        insight_bruto = gerar_insights_gemini(totais, total_geral)
+        insight_ia = markdown.markdown(insight_bruto)
+
+        labels_grafico = json.dumps(list(totais.keys()))
+        valores_grafico = json.dumps(list(totais.values()))
+
+        return render_template(
+            'index.html',
+            compras=compras,
+            totais=totais,
+            total_geral=total_geral,
+            insight_ia=insight_ia,
+            labels_grafico=labels_grafico,
+            valores_grafico=valores_grafico
+        )
 
     return render_template('index.html', compras=None)
 

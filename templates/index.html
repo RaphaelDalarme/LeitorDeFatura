@@ -20,12 +20,27 @@
 
         <!-- Form de Upload -->
         <div class="upload-card">
-            <form action="/" method="POST" enctype="multipart/form-data">
-                <div class="file-input-wrapper">
-                    <input type="file" name="fatura" id="fatura" accept=".pdf" required>
-                    <label for="fatura" class="file-label">📂 Selecionar Fatura PDF</label>
+            <h2>📄 Enviar Fatura</h2>
+
+            <!-- Exibição de Erros do Backend -->
+            {% if erro %}
+                <div class="alert alert-danger" style="color: var(--accent-rose); background: rgba(251, 113, 133, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; border: 1px solid var(--accent-rose);">
+                    ⚠️ {{ erro }}
                 </div>
-                <button type="submit" class="btn-submit">Processar Dashboard</button>
+            {% endif %}
+
+            <form action="/" method="POST" enctype="multipart/form-data" id="upload-form">
+                <div class="file-input-wrapper">
+                    <input type="file" name="fatura" id="fatura-input" accept=".pdf" required>
+                    <label for="fatura-input" class="file-label" id="file-label">
+                        📌 Clique aqui para selecionar o PDF da fatura
+                    </label>
+                </div>
+
+                <!-- Alerta em JavaScript para o arquivo selecionado -->
+                <p id="file-status" style="display: none; font-size: 0.85rem; margin-bottom: 15px; font-weight: 600;"></p>
+
+                <button type="submit" class="btn-submit">Processar Fatura</button>
             </form>
         </div>
 
@@ -98,42 +113,36 @@
         </div>
 
         <script>
-            document.addEventListener("DOMContentLoaded", function() {
-                const ctx = document.getElementById('chartCategorias').getContext('2d');
-                
-                const labelsDataText = '{{ labels_grafico | safe }}';
-                const valuesDataText = '{{ valores_grafico | safe }}';
+            const fileInput = document.getElementById('fatura-input');
+            const fileLabel = document.getElementById('file-label');
+            const fileStatus = document.getElementById('file-status');
 
-                const labelsData = JSON.parse(labelsDataText);
-                const valuesData = JSON.parse(valuesDataText);
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
 
-                new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labelsData,
-                        datasets: [{
-                            data: valuesData,
-                            backgroundColor: [
-                                '#38bdf8', '#818cf8', '#34d399', 
-                                '#fb7185', '#fbbf24', '#a78bfa'
-                            ],
-                            borderWidth: 2,
-                            borderColor: '#1e293b'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: { color: '#94a3b8', font: { family: 'Inter' } }
-                            }
-                        }
+                if (file) {
+                    // Verifica se o arquivo tem extensão PDF
+                    if (!file.name.toLowerCase().endsWith('.pdf')) {
+                        fileStatus.style.display = 'block';
+                        fileStatus.style.color = 'var(--accent-rose)';
+                        fileStatus.innerHTML = '❌ O arquivo selecionado não é um PDF!';
+                        fileLabel.innerText = '📌 Clique aqui para selecionar outro arquivo';
+                        this.value = ''; // Reseta a seleção
+                        return;
                     }
-                });
+
+                    // Mensagem quando o PDF é válido e foi carregado no input
+                    fileStatus.style.display = 'block';
+                    fileStatus.style.color = 'var(--accent-green)';
+                    fileStatus.innerHTML = `✅ Arquivo carregado: <strong>${file.name}</strong>`;
+                    fileLabel.innerText = '🔄 Clique se desejar trocar o PDF';
+                } else {
+                    fileStatus.style.display = 'none';
+                    fileLabel.innerText = '📌 Clique aqui para selecionar o PDF da fatura';
+                }
             });
         </script>
+
         {% endif %}
         <footer class="main-footer">
             <p>Desenvolvido por <span>Raphael Dalarme</span></p>
