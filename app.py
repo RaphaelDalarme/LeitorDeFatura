@@ -18,17 +18,34 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 CATEGORIAS = {
-    "transporte": ["uber", "99", "cabify", "taxi", "metrô", "ônibus", "bus", "trem", "vlt", "estacionamento"],
-    "assinaturas": ["spotify", "netflix", "prime", "deezer", "globoplay", "hbo", "disney", "paramount", "star+", "apple tv", "youtube premium", "playstation"],
-    "lazer_entretenimento": ["cinema", "teatro", "show", "parque", "zoo", "aquário", "museu", "balada", "bar", "pub", "karaokê", "cinemark"],
-    "alimentacao": ["ifood", "uber eats", "rappi", "restaurante", "lanchonete", "padaria", "mercado", "supermercado", "mercearia", "burger king", "burguer king", "mcdonalds", "outback"],
-    "compras_ecommerce": ["amazon", "mercadolivre", "americanas", "submarino", "magalu", "shoptime", "casas bahia", "carrefour", "extra", "ponto frio", "besni"],
-    "saude_fitness": ["farmácia", "farmacia", "farma", "drogaria", "academia", "nutricionista", "psicólogo", "personal trainer", "medicina", "hospital", "clínica", "heartfit"]
+    "transporte": [
+        "uber", "99", "cabify", "taxi", "metrô", "ônibus", "bus", "trem", "vlt", "estacionamento", "dutra drive"
+    ],
+    "assinaturas": [
+        "spotify", "netflix", "prime", "deezer", "globoplay", "hbo", "disney", "paramount", "star+", "apple tv", "youtube premium", "playstation", "google microfun"
+    ],
+    "lazer_entretenimento": [
+        "cinema", "teatro", "show", "parque", "zoo", "aquário", "museu", "balada", "bar", "pub", "karaokê", "cinemark", "hippo dino"
+    ],
+    "alimentacao": [
+        "ifood", "uber eats", "rappi", "restaurante", "lanchonete", "padaria", "mercado", "supermercado", "mercearia", "burger king", "burguer king", "mcdonalds", "outback", "pizzaria", "pastelaria", "carnes", "nobreza"
+    ],
+    "compras_ecommerce": [
+        "amazon", "mercadolivre", "mercadolivre*", "americanas", "submarino", "magalu", "shoptime", "casas bahia", "carrefour", "extra", "ponto frio", "besni", "shopee", "shopee *", "papelaria", "bellaluna", "bbook"
+    ],
+    "saude_fitness": [
+        "farmácia", "farmacia", "farma", "drogaria", "academia", "nutricionista", "psicólogo", "personal trainer", "medicina", "hospital", "clínica", "heartfit", "qualidoc"
+    ]
 }
 
 PADRAO_INTER = r"^(\d{2}\s+de\s+[a-z]{3}\.\s+\d{4})\s+(.*?)\s+-\s*(\+)?\s*R\$\s*([\d\.,]+)$"
-
 PADRAO_NUBANK = r"^(\d{2}\s+[A-Z]{3})\s+(?:\d{4}\s+)?(.*?)\s+(-)?\s*R\$\s*([\d\.,]+)$"
+PADRAO_ITAU = r"^(\d{2}/\d{2})\s+(.*?)\s+([\d\.,]+)$"
+
+TERMOS_IGNORAR = [
+    "total", "pagamento", "saldo", "mensalidade", "anuidade", 
+    "próxima fatura", "demais faturas", "limite", "encargos"
+]
 
 
 def processar_pdf(caminho_pdf):
@@ -50,10 +67,11 @@ def processar_pdf(caminho_pdf):
         if not linha_str:
             continue
 
+        data, descricao, eh_pagamento, valor_texto = None, None, False, None
+
         match_inter = re.search(PADRAO_INTER, linha_str, re.IGNORECASE)
         match_nubank = re.search(PADRAO_NUBANK, linha_str)
-
-        data, descricao, eh_pagamento, valor_texto = None, None, False, None
+        match_itau = re.search(PADRAO_ITAU, linha_str)
 
         if match_inter:
             data = match_inter.group(1)
@@ -63,11 +81,17 @@ def processar_pdf(caminho_pdf):
         elif match_nubank:
             data = match_nubank.group(1)
             descricao = match_nubank.group(2).strip()
-            eh_pagamento = match_nubank.group(3) == '-'  # Nubank usa -R$ para pagamentos/estornos
+            eh_pagamento = match_nubank.group(3) == '-'
             valor_texto = match_nubank.group(4)
+        elif match_itau:
+            data = match_itau.group(1)
+            descricao = match_itau.group(2).strip()
+            valor_texto = match_itau.group(3)
 
         if data and valor_texto:
-            if "saldo restante" in descricao.lower() or "pagamento" in descricao.lower():
+            desc_lower = descricao.lower()
+
+            if any(termo in desc_lower for termo in TERMOS_IGNORAR):
                 continue
 
             valor_limpo = valor_texto.replace('.', '').replace(',', '.')
@@ -78,7 +102,7 @@ def processar_pdf(caminho_pdf):
 
             if valor_float > 0 and not eh_pagamento:
                 desc_limpa = re.sub(r'\(.*?\)', '', descricao)
-                desc_limpa = re.sub(r'^(DL|EBN|MP|ASAAS)\s*\*?\s*', '', desc_limpa, flags=re.IGNORECASE)
+                desc_limpa = re.sub(r'^(DL|EBN|MP|ASAAS|MLP)\s*\*?\s*', '', desc_limpa, flags=re.IGNORECASE)
                 desc_busca = desc_limpa.lower().strip()
 
                 cat_encontrada = "Outros"
