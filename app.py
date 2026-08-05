@@ -31,7 +31,7 @@ CATEGORIAS = {
         "ifood", "uber eats", "rappi", "restaurante", "lanchonete", "padaria", "mercado", "supermercado", "mercearia", "burger king", "burguer king", "mcdonalds", "outback", "pizzaria", "pastelaria", "carnes", "nobreza"
     ],
     "compras_ecommerce": [
-        "amazon", "mercadolivre", "mercadolivre*", "americanas", "submarino", "magalu", "shoptime", "casas bahia", "carrefour", "extra", "ponto frio", "besni", "shopee", "shopee *", "papelaria", "bellaluna", "bbook"
+        "amazon", "mercadolivre", "americanas", "submarino", "magalu", "shoptime", "casas bahia", "carrefour", "extra", "ponto frio", "besni", "shopee", "bellaluna", "papelaria", "bbook"
     ],
     "saude_fitness": [
         "farmácia", "farmacia", "farma", "drogaria", "academia", "nutricionista", "psicólogo", "personal trainer", "medicina", "hospital", "clínica", "heartfit", "qualidoc"
@@ -40,11 +40,13 @@ CATEGORIAS = {
 
 PADRAO_INTER = r"^(\d{2}\s+de\s+[a-z]{3}\.\s+\d{4})\s+(.*?)\s+-\s*(\+)?\s*R\$\s*([\d\.,]+)$"
 PADRAO_NUBANK = r"^(\d{2}\s+[A-Z]{3})\s+(?:\d{4}\s+)?(.*?)\s+(-)?\s*R\$\s*([\d\.,]+)$"
-PADRAO_ITAU = r"^(\d{2}/\d{2})\s+(.*?)\s+([\d\.,]+)$"
+
+PADRAO_ITAU = r"^(\d{2}/\d{2})\s+([A-Za-z0-9\*\.\s\-\/]{3,50}?)\s+([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})$"
 
 TERMOS_IGNORAR = [
     "total", "pagamento", "saldo", "mensalidade", "anuidade", 
-    "próxima fatura", "demais faturas", "limite", "encargos"
+    "próxima fatura", "demais faturas", "limite", "encargos",
+    "resumo", "demonstrativo", "subtotal", "crédito", "anterior"
 ]
 
 
@@ -62,9 +64,23 @@ def processar_pdf(caminho_pdf):
 
     texto_limpo = re.sub(r'R\$\s*\n\s*', 'R$ ', texto_completo)
 
+    ignorar_bloco = False
+
     for linha in texto_limpo.split("\n"):
         linha_str = linha.strip()
         if not linha_str:
+            continue
+
+        linha_lower = linha_str.lower()
+
+        if "compras parceladas - próximas faturas" in linha_lower or "resumo da fatura" in linha_lower:
+            ignorar_bloco = True
+            continue
+
+        if ignorar_bloco and "lançamentos:" in linha_lower:
+            ignorar_bloco = False
+
+        if ignorar_bloco:
             continue
 
         data, descricao, eh_pagamento, valor_texto = None, None, False, None
@@ -102,7 +118,7 @@ def processar_pdf(caminho_pdf):
 
             if valor_float > 0 and not eh_pagamento:
                 desc_limpa = re.sub(r'\(.*?\)', '', descricao)
-                desc_limpa = re.sub(r'^(DL|EBN|MP|ASAAS|MLP)\s*\*?\s*', '', desc_limpa, flags=re.IGNORECASE)
+                desc_limpa = re.sub(r'^(DL|EBN|MP|ASAAS|MLP|PB)\s*\*?\s*', '', desc_limpa, flags=re.IGNORECASE)
                 desc_busca = desc_limpa.lower().strip()
 
                 cat_encontrada = "Outros"
