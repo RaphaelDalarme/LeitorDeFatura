@@ -28,6 +28,8 @@ CATEGORIAS = {
 
 PADRAO_INTER = r"^(\d{2}\s+de\s+[a-z]{3}\.\s+\d{4})\s+(.*?)\s+-\s*(\+)?\s*R\$\s*([\d\.,]+)$"
 
+PADRAO_NUBANK = r"^(\d{2}\s+[A-Z]{3})\s+(?:\d{4}\s+)?(.*?)\s+(-)?\s*R\$\s*([\d\.,]+)$"
+
 
 def processar_pdf(caminho_pdf):
     compras = []
@@ -35,43 +37,65 @@ def processar_pdf(caminho_pdf):
     total_geral = 0.0
 
     with pdfplumber.open(caminho_pdf) as pdf:
+        texto_completo = ""
         for page in pdf.pages:
-            texto = page.extract_text()
-            if texto:
-                for linha in texto.split("\n"):
-                    match = re.search(PADRAO_INTER, linha.strip(), re.IGNORECASE)
-                    if match:
-                        data = match.group(1)
-                        descricao = match.group(2).strip()
-                        eh_pagamento = match.group(3) == '+'
-                        valor_texto = match.group(4)
+            t = page.extract_text()
+            if t:
+                texto_completo += t + "\n"
 
-                        valor_limpo = valor_texto.replace('.', '').replace(',', '.')
-                        try:
-                            valor_float = float(valor_limpo)
-                        except ValueError:
-                            valor_float = 0.0
+    texto_limpo = re.sub(r'R\$\s*\n\s*', 'R$ ', texto_completo)
 
-                        if valor_float > 0 and not eh_pagamento and "PAGAMENTO" not in descricao:
-                            desc_limpa = re.sub(r'\(.*?\)', '', descricao)
-                            desc_limpa = re.sub(r'^(DL|EBN|MP|ASAAS)\s*\*?\s*', '', desc_limpa, flags=re.IGNORECASE)
-                            desc_busca = desc_limpa.lower().strip()
+    for linha in texto_limpo.split("\n"):
+        linha_str = linha.strip()
+        if not linha_str:
+            continue
 
-                            cat_encontrada = "Outros"
-                            for nome_cat, palavras in CATEGORIAS.items():
-                                if any(p in desc_busca for p in palavras):
-                                    cat_encontrada = nome_cat
-                                    break
+        match_inter = re.search(PADRAO_INTER, linha_str, re.IGNORECASE)
+        match_nubank = re.search(PADRAO_NUBANK, linha_str)
 
-                            item = {
-                                "data": data,
-                                "descricao": desc_limpa.strip(),
-                                "valor": valor_float,
-                                "categoria": cat_encontrada.replace('_', ' ').capitalize()
-                            }
-                            compras.append(item)
-                            totais_por_categoria[item["categoria"]] += valor_float
-                            total_geral += valor_float
+        data, descricao, eh_pagamento, valor_texto = None, None, False, None
+
+        if match_inter:
+            data = match_inter.group(1)
+            descricao = match_inter.group(2).strip()
+            eh_pagamento = match_inter.group(3) == '+'
+            valor_texto = match_inter.group(4)
+        elif match_nubank:
+            data = match_nubank.group(1)
+            descricao = match_nubank.group(2).strip()
+            eh_pagamento = match_nubank.group(3) == '-'  # Nubank usa -R$ para pagamentos/estornos
+            valor_texto = match_nubank.group(4)
+
+        if data and valor_texto:
+            if "saldo restante" in descricao.lower() or "pagamento" in descricao.lower():
+                continue
+
+            valor_limpo = valor_texto.replace('.', '').replace(',', '.')
+            try:
+                valor_float = float(valor_limpo)
+            except ValueError:
+                valor_float = 0.0
+
+            if valor_float > 0 and not eh_pagamento:
+                desc_limpa = re.sub(r'\(.*?\)', '', descricao)
+                desc_limpa = re.sub(r'^(DL|EBN|MP|ASAAS)\s*\*?\s*', '', desc_limpa, flags=re.IGNORECASE)
+                desc_busca = desc_limpa.lower().strip()
+
+                cat_encontrada = "Outros"
+                for nome_cat, palavras in CATEGORIAS.items():
+                    if any(p in desc_busca for p in palavras):
+                        cat_encontrada = nome_cat
+                        break
+
+                item = {
+                    "data": data,
+                    "descricao": desc_limpa.strip(),
+                    "valor": valor_float,
+                    "categoria": cat_encontrada.replace('_', ' ').capitalize()
+                }
+                compras.append(item)
+                totais_por_categoria[item["categoria"]] += valor_float
+                total_geral += valor_float
 
     return compras, dict(totais_por_categoria), total_geral
 
