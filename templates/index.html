@@ -113,6 +113,42 @@
         </div>
 
         <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const ctx = document.getElementById('chartCategorias').getContext('2d');
+                
+                const labelsDataText = '{{ labels_grafico | safe }}';
+                const valuesDataText = '{{ valores_grafico | safe }}';
+
+                const labelsData = JSON.parse(labelsDataText);
+                const valuesData = JSON.parse(valuesDataText);
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labelsData,
+                        datasets: [{
+                            data: valuesData,
+                            backgroundColor: [
+                                '#38bdf8', '#818cf8', '#34d399', 
+                                '#fb7185', '#fbbf24', '#a78bfa'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#1e293b'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#94a3b8', font: { family: 'Inter' } }
+                            }
+                        }
+                    }
+                });
+            });
+
             const fileInput = document.getElementById('fatura-input');
             const fileLabel = document.getElementById('file-label');
             const fileStatus = document.getElementById('file-status');
@@ -142,7 +178,6 @@
                 }
             });
         </script>
-
         {% endif %}
         <footer class="main-footer">
             <p>Desenvolvido por <span>Raphael Dalarme</span></p>
